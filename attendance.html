@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College Attendance System (Excel Export)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  body {
+    font-family: "Poppins", sans-serif;
+    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    margin: 0;
+    padding: 20px;
+    color: #222;
+  }
+  .container {
+    max-width: 950px;
+    background: #fff;
+    margin: auto;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+  }
+  h1 {text-align:center;color:#222;}
+  p.small{text-align:center;color:#555;margin-bottom:20px;}
+  input,button{font-family:inherit;font-size:14px}
+  input[type=text],input[type=date]{padding:8px;border:1px solid #ccc;border-radius:8px;}
+  button{padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:600;}
+  button:hover{opacity:.9}
+  .controls,.student-form{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;margin-bottom:15px;}
+  button.primary{background:#2575fc;color:white;}
+  button.ghost{background:white;color:#2575fc;border:1px solid #2575fc;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:15px;}
+  th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;}
+  th{background:#2575fc;color:white;}
+  tr.present td.status{background:#d4f8d4;color:#060;font-weight:600;}
+  tr.absent td.status{background:#ffd6d6;color:#900;font-weight:600;}
+  @media(max-width:700px){.controls,.student-form{flex-direction:column;}button,input{width:100%;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎓 College Attendance System</h1>
+  <p class="small">Mark attendance → Download Excel file</p>
+
+  <div class="controls">
+    <input id="date" type="date">
+    <input id="className" type="text" placeholder="Class / Subject">
+    <button id="loadBtn" class="primary">Load</button>
+    <button id="saveBtn" class="primary">Save</button>
+    <button id="excelBtn" class="primary">Download Excel</button>
+  </div>
+
+  <div class="student-form">
+    <input id="roll" type="text" placeholder="Roll No">
+    <input id="name" type="text" placeholder="Student Name">
+    <button id="addStudent" class="primary">Add / Update Student</button>
+    <input id="search" type="text" placeholder="Search..." style="flex:1">
+  </div>
+
+  <table id="table">
+    <thead>
+      <tr><th>#</th><th>Roll No</th><th>Name</th><th>Status</th><th>Action</th></tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const today = new Date().toISOString().slice(0,10);
+$('date').value = today;
+
+let students = JSON.parse(localStorage.getItem('students')||'[]');
+let records = JSON.parse(localStorage.getItem('records')||'{}');
+
+function key(){ return `${$('className').value||'Class'}|${$('date').value}`; }
+function save(){ localStorage.setItem('students',JSON.stringify(students)); localStorage.setItem('records',JSON.stringify(records)); }
+function render(filter=''){
+  const tb=$('tbody'); tb.innerHTML='';
+  const data=records[key()]||{};
+  students.filter(s=>s.name.toLowerCase().includes(filter.toLowerCase())||s.roll.toLowerCase().includes(filter.toLowerCase()))
+  .forEach((s,i)=>{
+    const st=data[s.roll]||'Absent';
+    const tr=document.createElement('tr');
+    tr.className=st.toLowerCase();
+    tr.innerHTML=`<td>${i+1}</td><td>${s.roll}</td><td>${s.name}</td><td class="status">${st}</td>
+    <td><button onclick="toggle('${s.roll}')" class="primary">${st==='Present'?'Absent':'Present'}</button>
+    <button onclick="del('${s.roll}')" class="ghost">Delete</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+function toggle(r){const k=key();records[k]=records[k]||{};records[k][r]=records[k][r]==='Present'?'Absent':'Present';save();render($('search').value);}
+function del(r){if(confirm('Delete student?')){students=students.filter(s=>s.roll!==r);save();render();}}
+$('addStudent').onclick=()=>{const roll=$('roll').value.trim(),name=$('name').value.trim();if(!roll||!name)return alert('Enter roll & name');
+const ex=students.find(s=>s.roll===roll);ex?ex.name=name:students.push({roll,name});save();$('roll').value='';$('name').value='';render();}
+$('saveBtn').onclick=()=>{save();alert('Saved ✅');}
+$('loadBtn').onclick=()=>render();
+$('search').oninput=e=>render(e.target.value);
+
+// ✅ Excel download
+$('excelBtn').onclick=()=>{
+  const k=key(); const data=records[k]||{};
+  if(students.length===0){alert('No students found');return;}
+  const rows=[["Roll No","Name","Status"]];
+  students.forEach(s=>rows.push([s.roll,s.name,data[s.roll]||'Absent']));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Attendance");
+  XLSX.writeFile(wb,`Attendance_${$('className').value||'Class'}_${$('date').value}.xlsx`);
+}
+
+render();
+</script>
+</body>
+</html>
